@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AMCAT Practice Arena</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="login-screen" id="loginScreen">
+        <div class="login-card">
+          <p class="eyebrow">AMCAT Practice Arena</p>
+          <h1>Login to save your progress.</h1>
+          <p class="summary">
+            Your attempts, scores, module results, and unfinished practice run
+            are saved on this browser for your profile.
+          </p>
+          <form class="login-form" id="loginForm">
+            <label>
+              Name
+              <input id="loginName" name="loginName" autocomplete="username" required minlength="2" />
+            </label>
+            <label>
+              Password
+              <input id="loginPassword" name="loginPassword" type="password" autocomplete="current-password" required minlength="4" />
+            </label>
+            <button class="primary-action" type="submit">Login / Create Profile</button>
+            <p class="form-message" id="loginMessage"></p>
+          </form>
+        </div>
+      </section>
+
+      <div class="user-bar hidden" id="userBar">
+        <div>
+          <span>Player</span>
+          <strong id="playerName">Guest</strong>
+        </div>
+        <button class="secondary-action compact-action" id="logoutButton">Logout</button>
+      </div>
+
+      <section class="intro-screen hidden" id="introScreen">
+        <div class="intro-copy">
+          <p class="eyebrow">AMCAT Practice Arena</p>
+          <h1>Train for the 50-question sprint.</h1>
+          <p class="summary">
+            English Comprehension, Logical Ability, and Quantitative Ability are
+            generated fresh every attempt with the same AMCAT-style question
+            count and time limits from your syllabus.
+          </p>
+          <div class="exam-strip" aria-label="Exam date">
+            <span>Exam focus</span>
+            <strong>WE ARE GONNA CRACK IT....!!!!</strong>
+          </div>
+          <div class="intro-actions">
+            <button class="primary-action" id="startExam">
+              <span>Start Practice</span>
+              <span aria-hidden="true">&gt;</span>
+            </button>
+            <button class="secondary-action hidden" id="resumeExam">Resume Saved Run</button>
+          </div>
+          <section class="history-panel" aria-label="Saved results">
+            <div class="history-heading">
+              <div>
+                <p class="eyebrow">Saved Progress</p>
+                <h2>Result History</h2>
+              </div>
+              <strong id="bestScore">Best 0/50</strong>
+            </div>
+            <div class="history-list" id="historyList"></div>
+          </section>
+          <section class="quest-panel" aria-label="Player progress">
+            <div class="quest-heading">
+              <div>
+                <p class="eyebrow">Quest Board</p>
+                <h2 id="rankTitle">Rookie Runner</h2>
+              </div>
+              <div class="level-medal">
+                <span id="levelText">Lv 1</span>
+                <small id="xpText">0 XP</small>
+              </div>
+            </div>
+            <div class="xp-track" aria-label="Level progress">
+              <div class="xp-fill" id="xpFill"></div>
+            </div>
+            <div class="quest-stats">
+              <span><strong id="totalAttempts">0</strong> attempts</span>
+              <span><strong id="totalCorrect">0</strong> correct</span>
+              <span><strong id="badgeCount">0</strong> badges</span>
+            </div>
+            <div class="badge-rack" id="badgeRack"></div>
+          </section>
+        </div>
+
+        <div class="score-orbit" aria-hidden="true">
+          <div class="dial">
+            <span>50</span>
+            <small>MCQ</small>
+          </div>
+          <div class="module-stack">
+            <div class="mini-card english">20 min<br />English</div>
+            <div class="mini-card logic">20 min<br />Logic</div>
+            <div class="mini-card quant">15 min<br />Quant</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="game-screen hidden" id="gameScreen">
+        <header class="game-header">
+          <div>
+            <p class="eyebrow" id="moduleLabel">Module</p>
+            <h2 id="questionTitle">Question 1</h2>
+          </div>
+          <div class="timer-panel">
+            <span id="timerText">20:00</span>
+            <small>Time left</small>
+          </div>
+        </header>
+
+        <div class="progress-track" aria-label="Question progress">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <section class="arena-hud" aria-label="Game status">
+          <div class="hud-pill">
+            <span>Shields</span>
+            <strong id="shieldText">3/3</strong>
+          </div>
+          <div class="hud-pill">
+            <span>Combo</span>
+            <strong id="comboText">x1</strong>
+          </div>
+          <div class="hud-pill">
+            <span>Rank XP</span>
+            <strong id="liveXpText">+0</strong>
+          </div>
+          <div class="power-row">
+            <button class="secondary-action compact-action" id="hintButton">Hint</button>
+            <button class="secondary-action compact-action" id="fiftyButton">50/50</button>
+          </div>
+        </section>
+
+        <section class="question-panel">
+          <div class="topic-row">
+            <span id="topicBadge">Vocabulary</span>
+            <span id="streakBadge">Streak 0</span>
+          </div>
+          <p class="hint-box hidden" id="hintBox"></p>
+          <p class="question-text" id="questionText"></p>
+          <div class="options-grid" id="optionsGrid"></div>
+        </section>
+
+        <footer class="playbar">
+          <div class="stats">
+            <span><strong id="scoreText">0</strong> score</span>
+            <span><strong id="answeredText">0</strong>/50 answered</span>
+          </div>
+          <button class="secondary-action" id="nextQuestion" disabled>Next</button>
+        </footer>
+      </section>
+
+      <section class="result-screen hidden" id="resultScreen">
+        <div class="result-hero">
+          <p class="eyebrow">Attempt Complete</p>
+          <h2 id="resultTitle">Score</h2>
+          <p id="resultMessage"></p>
+        </div>
+        <div class="reward-panel" id="rewardPanel"></div>
+        <div class="module-results" id="moduleResults"></div>
+        <div class="result-actions">
+          <button class="primary-action" id="retryExam">Play Again</button>
+          <button class="secondary-action" id="reviewMistakes">Review Misses</button>
+          <button class="secondary-action" id="backHome">Home</button>
+        </div>
+        <div class="review-list hidden" id="reviewList"></div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
