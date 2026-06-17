@@ -31,7 +31,7 @@ const STORAGE_KEY = "amcatPracticeArenaUsers";
 const SESSION_KEY = "amcatPracticeArenaCurrentUser";
 const SUPABASE_KEY = "sb_publishable_CAMYNujLRhfeGfv6ofDSrQ_ABk_4pMf";
 const SUPABASE_URL = "obsihotephygxkqpbrrv";
-
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
 
 const state = {
