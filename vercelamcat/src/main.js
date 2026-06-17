@@ -81,6 +81,30 @@ function decodeHTML(html) {
 function englishQuestion(forcedTopic) {
   const topic = forcedTopic || pick(MODULES[0].topics);
   
+  // Handled Vocabulary & Synonyms/Antonyms
+  if (["Synonyms", "Antonyms", "Contextual Vocabulary"].includes(topic)) {
+    const words = [
+      { word: "abundant", syn: "plentiful", ant: ["scarce", "ancient", "fragile", "silent"] },
+      { word: "meticulous", syn: "careful", ant: ["careless", "quick", "ordinary", "doubtful"] },
+      { word: "reluctant", syn: "unwilling", ant: ["eager", "bright", "loyal", "simple"] },
+      { word: "brief", syn: "short", ant: ["lengthy", "formal", "direct", "clever"] },
+      { word: "expand", syn: "increase", ant: ["reduce", "repair", "defend", "measure"] },
+      { word: "hostile", syn: "unfriendly", ant: ["friendly", "hidden", "patient", "useful"] },
+      { word: "lucid", syn: "clear", ant: ["confusing", "dark", "heavy", "complex"] },
+      { word: "obsolete", syn: "outdated", ant: ["modern", "current", "fresh", "new"] },
+      { word: "diligent", syn: "hardworking", ant: ["lazy", "tired", "slow", "bored"] }
+    ];
+    
+    // Package the word so pickUnique can track it by the 'text' property
+    const selected = pickUnique(words.map(w => ({ text: w.word, data: w })));
+    const { word, syn, ant } = selected.data;
+    
+    if (topic === "Antonyms") {
+      return { topic, text: `Choose the antonym of "${word}".`, answer: ant[0], options: makeOptions(ant[0], [syn, ...ant.slice(1), "neutral"]) };
+    }
+    return { topic, text: `Choose the closest meaning of "${word}".`, answer: syn, options: makeOptions(syn, ant) };
+  }
+  
   if (topic === "Reading Comprehension") {
     const passages = [
       { text: "Passage: A team improves fastest when it reviews small failures immediately after practice.", answer: "Quick review helps learning", distractors: ["Luck matters more than practice", "Notes should never be used", "Speed is always more important"] },
@@ -165,19 +189,15 @@ async function buildExam() {
   state.moduleEnds = [];
   state.usedQuestions = new Set();
   
-  let apiEnglishQs = [];
   let apiLogicQs = [];
 
   try {
-    const engRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[0].count}&category=9&type=multiple`);
-    const engData = await engRes.json();
-    apiEnglishQs = engData.results || [];
-
+    // Only fetching API data for Logic now! English is 100% local.
     const logRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[1].count}&category=18&type=multiple`);
     const logData = await logRes.json();
     apiLogicQs = logData.results || [];
   } catch (error) {
-    console.warn("External API fetch incomplete. Using local generators for missing data.");
+    console.warn("External API fetch incomplete. Using local generators.");
   }
 
   MODULES.forEach((module) => {
@@ -186,14 +206,8 @@ async function buildExam() {
       const topic = pick(module.topics);
 
       if (module.key === "english") {
-        if (topic === "Reading Comprehension") {
-          q = englishQuestion("Reading Comprehension");
-        } else if (apiEnglishQs[i]) {
-          const item = apiEnglishQs[i];
-          q = { topic: "API: Vocabulary & General", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
-        } else {
-          q = englishQuestion(topic);
-        }
+        // ALWAYS use our local AMCAT generator for English
+        q = englishQuestion(topic);
       } else if (module.key === "logic" && apiLogicQs[i]) {
         const item = apiLogicQs[i];
         q = { topic: "API: Logic & Tech", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
