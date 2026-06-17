@@ -19,7 +19,7 @@ const MODULES = [
     count: 12,
     minutes: 15,
     topics: ["Divisibility", "HCF & LCM", "Numbers", "Decimal Fractions", "Profit & Loss", "Interest", "Time Speed Distance", "Logarithms", "Permutation", "Probability"],
-  },
+  }
 ];
 
 const STORAGE_KEY = "amcatPracticeArenaUsers";
@@ -41,6 +41,7 @@ const state = {
   liveXp: 0,
   hintUsed: false,
   fiftyUsed: false,
+  usedQuestions: new Set(),
 };
 
 let currentUser = null;
@@ -56,6 +57,13 @@ const screens = {
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (items) => items[rand(0, items.length - 1)];
 
+function pickUnique(pool) {
+  const available = pool.filter(q => !state.usedQuestions.has(q.text));
+  const selected = available.length > 0 ? pick(available) : pick(pool);
+  state.usedQuestions.add(selected.text);
+  return selected;
+}
+
 function shuffle(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
@@ -64,163 +72,87 @@ function makeOptions(answer, distractors) {
   return shuffle([answer, ...shuffle(distractors).slice(0, 3)]);
 }
 
-function vocabularyQuestion(topic) {
-  const words = [
-    ["abundant", "plentiful", ["scarce", "ancient", "fragile", "silent"]],
-    ["meticulous", "careful", ["careless", "quick", "ordinary", "doubtful"]],
-    ["reluctant", "unwilling", ["eager", "bright", "loyal", "simple"]],
-    ["brief", "short", ["lengthy", "formal", "direct", "clever"]],
-    ["expand", "increase", ["reduce", "repair", "defend", "measure"]],
-    ["hostile", "unfriendly", ["friendly", "hidden", "patient", "useful"]],
-  ];
-  const [word, synonym, antonyms] = pick(words);
-  if (topic === "Antonyms") {
-    return {
-      topic,
-      text: `Choose the antonym of "${word}".`,
-      answer: antonyms[0],
-      options: makeOptions(antonyms[0], [synonym, ...antonyms.slice(1), "neutral"]),
-    };
-  }
-  return {
-    topic,
-    text: `Choose the closest meaning of "${word}".`,
-    answer: synonym,
-    options: makeOptions(synonym, antonyms),
-  };
+function decodeHTML(html) {
+  const txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
 }
 
-function englishQuestion() {
-  const topic = pick(MODULES[0].topics);
-  if (["Synonyms", "Antonyms", "Contextual Vocabulary"].includes(topic)) return vocabularyQuestion(topic);
+function englishQuestion(forcedTopic) {
+  const topic = forcedTopic || pick(MODULES[0].topics);
+  
   if (topic === "Reading Comprehension") {
     const passages = [
-      ["A team improves fastest when it reviews small failures immediately after practice.", "quick review helps learning"],
-      ["A product is useful only when it solves a real problem for the person using it.", "usefulness depends on solving user problems"],
-      ["Regular mock tests reveal weak areas better than reading notes alone.", "practice tests identify gaps"],
+      { text: "Passage: A team improves fastest when it reviews small failures immediately after practice.", answer: "Quick review helps learning", distractors: ["Luck matters more than practice", "Notes should never be used", "Speed is always more important"] },
+      { text: "Passage: A product is useful only when it solves a real problem for the person using it.", answer: "Usefulness depends on solving user problems", distractors: ["Design is more important than function", "Expensive products are better", "Users don't know what they want"] },
+      { text: "Passage: Regular mock tests reveal weak areas better than reading notes alone.", answer: "Practice tests identify gaps", distractors: ["Notes are completely useless", "Mock tests guarantee a job", "Weak areas cannot be fixed"] },
     ];
-    const [passage, answer] = pick(passages);
-    return {
-      topic,
-      text: `${passage} What is the main idea?`,
-      answer,
-      options: makeOptions(answer, ["luck matters more than practice", "notes should never be used", "speed is always more important", "all teams work the same way"]),
-    };
+    const selected = pickUnique(passages);
+    return { topic: "Reading Comprehension", text: `${selected.text} \n\nQuestion: What is the main idea of this passage?`, answer: selected.answer, options: makeOptions(selected.answer, selected.distractors) };
   }
+  
   if (topic === "Sentence Improvement") {
-    return {
-      topic,
-      text: "Choose the best improvement: She is senior than me in the company.",
-      answer: "She is senior to me in the company.",
-      options: makeOptions("She is senior to me in the company.", ["She is senior from me in the company.", "She is senior than I in the company.", "No improvement"]),
-    };
+    const questions = [
+      { text: "Choose the best improvement: She is senior than me in the company.", answer: "She is senior to me in the company.", distractors: ["She is senior from me in the company.", "She is senior than I in the company.", "No improvement"] },
+      { text: "Choose the best improvement: I prefer coffee than tea.", answer: "I prefer coffee to tea.", distractors: ["I prefer coffee over tea.", "I prefer coffee more than tea.", "No improvement"] },
+      { text: "Choose the best improvement: He didn't went to the store.", answer: "He didn't go to the store.", distractors: ["He hasn't went to the store.", "He not went to the store.", "No improvement"] }
+    ];
+    const selected = pickUnique(questions);
+    return { topic, text: selected.text, answer: selected.answer, options: makeOptions(selected.answer, selected.distractors) };
   }
-  return {
-    topic,
-    text: "Find the error: Neither the manager nor the employees was ready for the audit.",
-    answer: "was ready",
-    options: makeOptions("was ready", ["Neither the manager", "nor the employees", "for the audit"]),
-  };
+  
+  const errorQs = [
+    { text: "Find the error: Neither the manager nor the employees was ready for the audit.", answer: "was ready", distractors: ["Neither the manager", "nor the employees", "for the audit"] },
+    { text: "Find the error: One of the boys have left his bag in the classroom.", answer: "have left", distractors: ["One of the boys", "his bag", "in the classroom"] },
+    { text: "Find the error: The scenery of Kashmir are very beautiful.", answer: "are very beautiful", distractors: ["The scenery", "of Kashmir", "No error"] }
+  ];
+  const selectedErr = pickUnique(errorQs);
+  return { topic: "Error Identification", text: selectedErr.text, answer: selectedErr.answer, options: makeOptions(selectedErr.answer, selectedErr.distractors) };
 }
 
 function logicalQuestion() {
   const topic = pick(MODULES[1].topics);
+  
   if (topic === "Number Series") {
     const start = rand(2, 9);
     const gap = rand(3, 8);
     const answer = start + gap * 4;
-    return {
-      topic,
-      text: `Find the next number: ${start}, ${start + gap}, ${start + gap * 2}, ${start + gap * 3}, ?`,
-      answer: String(answer),
-      options: makeOptions(String(answer), [String(answer + gap), String(answer - 1), String(answer + 2), String(answer - gap)]),
-    };
+    return { topic, text: `Find the next number: ${start}, ${start + gap}, ${start + gap * 2}, ${start + gap * 3}, ?`, answer: String(answer), options: makeOptions(String(answer), [String(answer + gap), String(answer - 1), String(answer + 2), String(answer - gap)]) };
   }
+  
   if (topic === "Direction Sense") {
     const north = rand(2, 8);
     const east = rand(3, 9);
-    return {
-      topic,
-      text: `A person walks ${north} km north, then ${east} km east. Which direction is the person from the starting point?`,
-      answer: "North-East",
-      options: makeOptions("North-East", ["South-East", "North-West", "East", "South"]),
-    };
+    return { topic, text: `A person walks ${north} km north, then ${east} km east. Which direction is the person from the starting point?`, answer: "North-East", options: makeOptions("North-East", ["South-East", "North-West", "East", "South"]) };
   }
-  if (topic === "Analogy") {
-    return {
-      topic,
-      text: "Book is to Reading as Fork is to ____.",
-      answer: "Eating",
-      options: makeOptions("Eating", ["Drawing", "Writing", "Sleeping", "Driving"]),
-    };
-  }
-  if (topic === "Coding Deductive Logic") {
-    const code = rand(2, 5);
-    return {
-      topic,
-      text: `If A = ${code}, B = ${code + 1}, C = ${code + 2}, what is the value of CAB?`,
-      answer: `${code + 2}${code}${code + 1}`,
-      options: makeOptions(`${code + 2}${code}${code + 1}`, [`${code}${code + 1}${code + 2}`, `${code + 1}${code + 2}${code}`, `${code + 2}${code + 1}${code}`, `${code}${code + 2}${code + 1}`]),
-    };
-  }
-  return {
-    topic,
-    text: "Statements: All roses are flowers. Some flowers fade quickly. Which conclusion definitely follows?",
-    answer: "All roses are flowers",
-    options: makeOptions("All roses are flowers", ["All flowers are roses", "Some roses fade quickly", "No flowers fade", "All fading things are roses"]),
-  };
+
+  const logicQs = [
+    { text: "Statements: All roses are flowers. Some flowers fade quickly. Which conclusion definitely follows?", answer: "All roses are flowers", distractors: ["All flowers are roses", "Some roses fade quickly", "No flowers fade", "All fading things are roses"] },
+    { text: "Statements: All cats are animals. No animals are machines. Which conclusion follows?", answer: "No cats are machines", distractors: ["Some cats are machines", "All machines are animals", "Some animals are cats", "All animals are cats"] }
+  ];
+  const selectedLogic = pickUnique(logicQs);
+  return { topic: "Deductive Logic", text: selectedLogic.text, answer: selectedLogic.answer, options: makeOptions(selectedLogic.answer, selectedLogic.distractors) };
 }
 
 function quantQuestion() {
   const topic = pick(MODULES[2].topics);
+  
   if (topic === "Profit & Loss") {
     const cp = rand(20, 80) * 10;
     const profit = pick([10, 15, 20, 25]);
     const answer = cp + (cp * profit) / 100;
-    return {
-      topic,
-      text: `An article costs Rs. ${cp}. It is sold at ${profit}% profit. What is the selling price?`,
-      answer: `Rs. ${answer}`,
-      options: makeOptions(`Rs. ${answer}`, [`Rs. ${cp - profit}`, `Rs. ${cp + profit}`, `Rs. ${answer + 20}`, `Rs. ${answer - 20}`]),
-    };
+    return { topic, text: `An article costs Rs. ${cp}. It is sold at ${profit}% profit. What is the selling price?`, answer: `Rs. ${answer}`, options: makeOptions(`Rs. ${answer}`, [`Rs. ${cp - profit}`, `Rs. ${cp + profit}`, `Rs. ${answer + 20}`, `Rs. ${answer - 20}`]) };
   }
+  
   if (topic === "Time Speed Distance") {
     const speed = rand(30, 80);
     const time = rand(2, 6);
-    return {
-      topic,
-      text: `A train travels at ${speed} km/h for ${time} hours. What distance does it cover?`,
-      answer: `${speed * time} km`,
-      options: makeOptions(`${speed * time} km`, [`${speed + time} km`, `${speed * (time + 1)} km`, `${speed * time - 10} km`, `${speed * time + 15} km`]),
-    };
+    return { topic, text: `A train travels at ${speed} km/h for ${time} hours. What distance does it cover?`, answer: `${speed * time} km`, options: makeOptions(`${speed * time} km`, [`${speed + time} km`, `${speed * (time + 1)} km`, `${speed * time - 10} km`, `${speed * time + 15} km`]) };
   }
-  if (topic === "HCF & LCM") {
-    const a = pick([12, 18, 24, 30, 36]);
-    const b = pick([18, 24, 30, 42, 48]);
-    const hcf = gcd(a, b);
-    return {
-      topic,
-      text: `Find the HCF of ${a} and ${b}.`,
-      answer: String(hcf),
-      options: makeOptions(String(hcf), [String(hcf + 2), String(Math.max(a, b)), String(a + b), String(Math.abs(a - b))]),
-    };
-  }
-  if (topic === "Probability") {
-    return {
-      topic,
-      text: "A fair die is rolled once. What is the probability of getting an even number?",
-      answer: "1/2",
-      options: makeOptions("1/2", ["1/3", "1/6", "2/3", "5/6"]),
-    };
-  }
+  
   const a = rand(12, 48);
   const b = rand(3, 12);
-  return {
-    topic,
-    text: `Calculate ${a} x ${b}.`,
-    answer: String(a * b),
-    options: makeOptions(String(a * b), [String(a + b), String(a * b + b), String(a * b - a), String(a * (b + 1))]),
-  };
+  return { topic: "Numbers", text: `Calculate ${a} x ${b}.`, answer: String(a * b), options: makeOptions(String(a * b), [String(a + b), String(a * b + b), String(a * b - a), String(a * (b + 1))]) };
 }
 
 function gcd(a, b) {
@@ -228,16 +160,53 @@ function gcd(a, b) {
   return a;
 }
 
-function buildExam() {
+async function buildExam() {
   state.questions = [];
   state.moduleEnds = [];
+  state.usedQuestions = new Set();
+  
+  let apiEnglishQs = [];
+  let apiLogicQs = [];
+
+  try {
+    const engRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[0].count}&category=9&type=multiple`);
+    const engData = await engRes.json();
+    apiEnglishQs = engData.results || [];
+
+    const logRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[1].count}&category=18&type=multiple`);
+    const logData = await logRes.json();
+    apiLogicQs = logData.results || [];
+  } catch (error) {
+    console.warn("External API fetch incomplete. Using local generators for missing data.");
+  }
+
   MODULES.forEach((module) => {
-    const generator = module.key === "english" ? englishQuestion : module.key === "logic" ? logicalQuestion : quantQuestion;
     for (let i = 0; i < module.count; i += 1) {
-      state.questions.push({ ...generator(), module: module.name, moduleKey: module.key, minutes: module.minutes });
+      let q = null;
+      const topic = pick(module.topics);
+
+      if (module.key === "english") {
+        if (topic === "Reading Comprehension") {
+          q = englishQuestion("Reading Comprehension");
+        } else if (apiEnglishQs[i]) {
+          const item = apiEnglishQs[i];
+          q = { topic: "API: Vocabulary & General", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
+        } else {
+          q = englishQuestion(topic);
+        }
+      } else if (module.key === "logic" && apiLogicQs[i]) {
+        const item = apiLogicQs[i];
+        q = { topic: "API: Logic & Tech", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
+      } else {
+        const generator = module.key === "logic" ? logicalQuestion : quantQuestion;
+        q = generator();
+      }
+
+      state.questions.push({ ...q, module: module.name, moduleKey: module.key, minutes: module.minutes });
     }
     state.moduleEnds.push(state.questions.length - 1);
   });
+
   state.index = 0;
   state.score = 0;
   state.streak = 0;
@@ -257,8 +226,20 @@ function showScreen(name) {
   $("#userBar").classList.toggle("hidden", name === "login");
 }
 
-function startExam() {
-  buildExam();
+async function startExam() {
+  const btn = $("#startExam");
+  const retryBtn = $("#retryExam");
+  
+  if(btn) btn.innerHTML = "<span>Connecting to Database...</span>";
+  if(retryBtn) retryBtn.innerHTML = "<span>Fetching New Data...</span>";
+  if(btn) btn.disabled = true;
+  if(retryBtn) retryBtn.disabled = true;
+
+  await buildExam();
+
+  if(btn) { btn.innerHTML = `<span>Start Practice</span><span aria-hidden="true">&gt;</span>`; btn.disabled = false; }
+  if(retryBtn) { retryBtn.innerHTML = "Play Again"; retryBtn.disabled = false; }
+
   showScreen("game");
   startModuleTimer();
   renderQuestion();
@@ -312,12 +293,14 @@ function renderQuestion() {
   $("#liveXpText").textContent = `+${state.liveXp}`;
   $("#hintBox").classList.add("hidden");
   $("#hintBox").textContent = "";
+  
   $("#hintButton").disabled = state.hintUsed;
   $("#fiftyButton").disabled = state.fiftyUsed;
   $("#nextQuestion").disabled = true;
 
   const optionsGrid = $("#optionsGrid");
   optionsGrid.innerHTML = "";
+  
   question.options.forEach((option, index) => {
     const button = document.createElement("button");
     button.className = "option-button";
@@ -332,7 +315,9 @@ function chooseAnswer(button, selected) {
   if (state.locked) return;
   state.locked = true;
   const question = state.questions[state.index];
+  
   const correct = selected === question.answer;
+
   const comboBonus = correct ? state.streak * 2 : 0;
   const gained = correct ? 10 + comboBonus : 0;
   state.score += gained;
@@ -374,7 +359,7 @@ function finishExam() {
   showScreen("result");
   const correct = state.answers.filter((answer) => answer.correct).length;
   const accuracy = Math.round((correct / state.questions.length) * 100);
-  $("#resultTitle").textContent = `${correct}/50 correct`;
+  $("#resultTitle").textContent = `${correct}/${state.questions.length} correct`;
   $("#resultMessage").textContent = `You scored ${state.score} points with ${accuracy}% accuracy. Play again to get a fresh randomized AMCAT-style set.`;
   renderModuleResults();
   const rewards = saveFinishedAttempt(correct, accuracy);
@@ -390,7 +375,7 @@ function renderModuleResults() {
     const correct = answers.filter((answer) => answer.correct).length;
     const card = document.createElement("div");
     card.className = "module-card";
-    card.innerHTML = `<div><strong>${module.name}</strong><span>${module.count} MCQ - ${module.minutes} minutes</span></div><strong>${correct}/${module.count}</strong>`;
+    card.innerHTML = `<div><strong>${module.name}</strong><span>${module.count} Q - ${module.minutes} minutes</span></div><strong>${correct}/${module.count}</strong>`;
     container.appendChild(card);
   });
 }
@@ -414,11 +399,8 @@ function reviewMistakes() {
 }
 
 function loadUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } 
+  catch { return {}; }
 }
 
 function saveUsers(users) {
@@ -455,15 +437,7 @@ function login(event) {
   }
 
   if (!users[key]) {
-    users[key] = {
-      name,
-      password,
-      attempts: [],
-      inProgress: null,
-      xp: 0,
-      badges: [],
-      createdAt: new Date().toISOString(),
-    };
+    users[key] = { name, password, attempts: [], inProgress: null, xp: 0, badges: [], createdAt: new Date().toISOString() };
     saveUsers(users);
   }
 
@@ -502,22 +476,20 @@ function renderHistory() {
   $("#resumeExam").classList.toggle("hidden", !user?.inProgress);
 
   if (!attempts.length) {
-    $("#bestScore").textContent = "Best 0/50";
+    $("#bestScore").textContent = `Best 0/${MODULES.reduce((sum, m) => sum + m.count, 0)}`;
     list.innerHTML = `<p class="empty-history">No saved results yet. Complete one practice attempt to start tracking your progress.</p>`;
     return;
   }
 
+  const totalQuestions = MODULES.reduce((sum, m) => sum + m.count, 0);
   const best = attempts.reduce((top, attempt) => (attempt.correct > top.correct ? attempt : top), attempts[0]);
-  $("#bestScore").textContent = `Best ${best.correct}/50`;
+  $("#bestScore").textContent = `Best ${best.correct}/${totalQuestions}`;
 
   attempts.slice(0, 5).forEach((attempt) => {
-    const date = new Date(attempt.finishedAt).toLocaleString([], {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+    const date = new Date(attempt.finishedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
     const item = document.createElement("div");
     item.className = "history-item";
-    item.innerHTML = `<div><strong>${date}</strong><span>${attempt.accuracy}% accuracy - ${attempt.score} points</span></div><div class="history-score">${attempt.correct}/50</div>`;
+    item.innerHTML = `<div><strong>${date}</strong><span>${attempt.accuracy}% accuracy - ${attempt.score} points</span></div><div class="history-score">${attempt.correct}/${totalQuestions}</div>`;
     list.appendChild(item);
   });
 }
@@ -562,29 +534,21 @@ function renderQuestBoard() {
 
 function hintText(topic) {
   const hints = {
-    Synonyms: "Look for the option with the closest meaning, not just a related word.",
-    Antonyms: "Reverse the emotion or direction of the word.",
-    "Contextual Vocabulary": "Read the sentence tone first, then choose the word that fits that tone.",
-    "Error Identification": "Check subject-verb agreement and comparison words first.",
-    "Sentence Improvement": "Prefer the grammatically natural sentence.",
-    "Reading Comprehension": "Find the main idea, not a small detail.",
-    "Number Series": "Check whether the same difference repeats.",
-    "Direction Sense": "Draw north, south, east, west quickly in your mind.",
-    Analogy: "Identify the relationship between the first pair, then copy it.",
-    "Coding Deductive Logic": "Convert each letter before joining the code.",
+    "Numbers": "Don't rush the multiplication. Break it into smaller parts if needed.",
+    "External: Reading & General": "Read the question twice before looking at the answers.",
+    "External: Logic & Tech": "Eliminate the most obviously wrong answer first.",
     "Profit & Loss": "Selling price = cost price plus profit.",
     "Time Speed Distance": "Distance = speed x time.",
-    "HCF & LCM": "HCF is the biggest number dividing both values.",
-    Probability: "Probability = favorable outcomes / total outcomes.",
   };
   return hints[topic] || "Eliminate the clearly wrong options first, then compare the final two.";
 }
 
 function useHint() {
   if (state.locked || state.hintUsed) return;
+  const question = state.questions[state.index];
+  
   state.hintUsed = true;
   state.liveXp = Math.max(0, state.liveXp - 5);
-  const question = state.questions[state.index];
   $("#hintBox").textContent = hintText(question.topic);
   $("#hintBox").classList.remove("hidden");
   $("#hintButton").disabled = true;
@@ -594,12 +558,11 @@ function useHint() {
 
 function useFifty() {
   if (state.locked || state.fiftyUsed) return;
+  const question = state.questions[state.index];
+  
   state.fiftyUsed = true;
   state.liveXp = Math.max(0, state.liveXp - 10);
-  const question = state.questions[state.index];
-  const wrongButtons = [...document.querySelectorAll(".option-button")]
-    .filter((button) => button.dataset.value !== question.answer)
-    .slice(0, 2);
+  const wrongButtons = [...document.querySelectorAll(".option-button")].filter((button) => button.dataset.value !== question.answer).slice(0, 2);
   wrongButtons.forEach((button) => {
     button.disabled = true;
     button.style.opacity = "0.34";
@@ -671,13 +634,7 @@ function resumeAttempt() {
 function moduleSummary() {
   return MODULES.map((module) => {
     const answers = state.answers.filter((answer) => answer.moduleKey === module.key);
-    return {
-      key: module.key,
-      name: module.name,
-      total: module.count,
-      correct: answers.filter((answer) => answer.correct).length,
-      minutes: module.minutes,
-    };
+    return { key: module.key, name: module.name, total: module.count, correct: answers.filter((answer) => answer.correct).length, minutes: module.minutes };
   });
 }
 
@@ -688,12 +645,7 @@ function saveFinishedAttempt(correct, accuracy) {
   updateUser((user) => {
     const attempts = user.attempts || [];
     const badges = new Set(user.badges || []);
-    const award = (badge) => {
-      if (!badges.has(badge)) {
-        badges.add(badge);
-        newBadges.push(badge);
-      }
-    };
+    const award = (badge) => { if (!badges.has(badge)) { badges.add(badge); newBadges.push(badge); } };
 
     award("First Login");
     if (!attempts.length) award("First Run");
@@ -729,12 +681,8 @@ function saveFinishedAttempt(correct, accuracy) {
 
 function boot() {
   currentUser = localStorage.getItem(SESSION_KEY);
-  if (currentUser && getUser()) {
-    openHome();
-  } else {
-    currentUser = null;
-    showScreen("login");
-  }
+  if (currentUser && getUser()) { openHome(); } 
+  else { currentUser = null; showScreen("login"); }
 }
 
 $("#loginForm").addEventListener("submit", login);
