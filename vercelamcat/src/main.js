@@ -1,14 +1,3 @@
-// At the very top of main.js
-
-
-// This waits for the Supabase library to exist before trying to use it
-window.addEventListener('load', () => {
-    if (window.supabase) {
-        const supabaseUrl = 'YOUR_URL';
-        const supabaseKey = 'YOUR_KEY';
-        supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-    }
-});
 import { inject } from '@vercel/analytics';
 
 // Initialize Vercel Web Analytics
@@ -42,7 +31,7 @@ const STORAGE_KEY = "amcatPracticeArenaUsers";
 const SESSION_KEY = "amcatPracticeArenaCurrentUser";
 const SUPABASE_KEY = "sb_publishable_CAMYNujLRhfeGfv6ofDSrQ_ABk_4pMf";
 const SUPABASE_URL = "obsihotephygxkqpbrrv";
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
 
 
 const state = {
@@ -208,37 +197,35 @@ async function buildExam() {
   state.questions = [];
   state.moduleEnds = [];
   state.usedQuestions = new Set();
+  
+  let apiLogicQs = [];
 
-  // 1. Fetch your 500 real questions from Supabase
-  const { data: allDbQuestions, error } = await supabase
-    .from('questions')
-    .select('*');
-
-  if (error) {
-    console.error("Supabase Error:", error);
-    return;
+  try {
+    // Only fetching API data for Logic now! English is 100% local.
+    const logRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[1].count}&category=18&type=multiple`);
+    const logData = await logRes.json();
+    apiLogicQs = logData.results || [];
+  } catch (error) {
+    console.warn("External API fetch incomplete. Using local generators.");
   }
 
-  // 2. Loop through your modules and pull from the DB
   MODULES.forEach((module) => {
-    // Filter questions just for this specific module (english, logic, or quant)
-    const moduleQuestions = allDbQuestions.filter(q => q.module === module.key);
-    
-    // Pick the number of questions defined in your config
     for (let i = 0; i < module.count; i += 1) {
-      // Pick a random question from your database
-      const q = moduleQuestions[Math.floor(Math.random() * moduleQuestions.length)];
-      
-      // Format it for your app
-      state.questions.push({ 
-        topic: q.topic, 
-        text: q.text, 
-        answer: q.answer, 
-        options: [...JSON.parse(q.distractors), q.answer].sort(() => Math.random() - 0.5),
-        module: module.name, 
-        moduleKey: module.key, 
-        minutes: module.minutes 
-      });
+      let q = null;
+      const topic = pick(module.topics);
+
+      if (module.key === "english") {
+        // ALWAYS use our local AMCAT generator for English
+        q = englishQuestion(topic);
+      } else if (module.key === "logic" && apiLogicQs[i]) {
+        const item = apiLogicQs[i];
+        q = { topic: "API: Logic & Tech", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
+      } else {
+        const generator = module.key === "logic" ? logicalQuestion : quantQuestion;
+        q = generator();
+      }
+
+      state.questions.push({ ...q, module: module.name, moduleKey: module.key, minutes: module.minutes });
     }
     state.moduleEnds.push(state.questions.length - 1);
   });
