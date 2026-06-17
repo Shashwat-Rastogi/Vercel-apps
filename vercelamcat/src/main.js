@@ -197,35 +197,37 @@ async function buildExam() {
   state.questions = [];
   state.moduleEnds = [];
   state.usedQuestions = new Set();
-  
-  let apiLogicQs = [];
 
-  try {
-    // Only fetching API data for Logic now! English is 100% local.
-    const logRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[1].count}&category=18&type=multiple`);
-    const logData = await logRes.json();
-    apiLogicQs = logData.results || [];
-  } catch (error) {
-    console.warn("External API fetch incomplete. Using local generators.");
+  // 1. Fetch your 500 real questions from Supabase
+  const { data: allDbQuestions, error } = await supabase
+    .from('questions')
+    .select('*');
+
+  if (error) {
+    console.error("Supabase Error:", error);
+    return;
   }
 
+  // 2. Loop through your modules and pull from the DB
   MODULES.forEach((module) => {
+    // Filter questions just for this specific module (english, logic, or quant)
+    const moduleQuestions = allDbQuestions.filter(q => q.module === module.key);
+    
+    // Pick the number of questions defined in your config
     for (let i = 0; i < module.count; i += 1) {
-      let q = null;
-      const topic = pick(module.topics);
-
-      if (module.key === "english") {
-        // ALWAYS use our local AMCAT generator for English
-        q = englishQuestion(topic);
-      } else if (module.key === "logic" && apiLogicQs[i]) {
-        const item = apiLogicQs[i];
-        q = { topic: "API: Logic & Tech", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
-      } else {
-        const generator = module.key === "logic" ? logicalQuestion : quantQuestion;
-        q = generator();
-      }
-
-      state.questions.push({ ...q, module: module.name, moduleKey: module.key, minutes: module.minutes });
+      // Pick a random question from your database
+      const q = moduleQuestions[Math.floor(Math.random() * moduleQuestions.length)];
+      
+      // Format it for your app
+      state.questions.push({ 
+        topic: q.topic, 
+        text: q.text, 
+        answer: q.answer, 
+        options: [...JSON.parse(q.distractors), q.answer].sort(() => Math.random() - 0.5),
+        module: module.name, 
+        moduleKey: module.key, 
+        minutes: module.minutes 
+      });
     }
     state.moduleEnds.push(state.questions.length - 1);
   });
