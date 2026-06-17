@@ -1,3 +1,14 @@
+// At the very top of main.js
+let supabase;
+
+// This waits for the Supabase library to exist before trying to use it
+window.addEventListener('load', () => {
+    if (window.supabase) {
+        const supabaseUrl = 'YOUR_URL';
+        const supabaseKey = 'YOUR_KEY';
+        supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    }
+});
 import { inject } from '@vercel/analytics';
 
 // Initialize Vercel Web Analytics
