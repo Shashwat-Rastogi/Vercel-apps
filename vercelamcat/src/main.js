@@ -1,5 +1,5 @@
 // At the very top of main.js
-let supabase;
+
 
 // This waits for the Supabase library to exist before trying to use it
 window.addEventListener('load', () => {
