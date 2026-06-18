@@ -1,7 +1,13 @@
 import { inject } from '@vercel/analytics';
+import { createClient } from '@supabase/supabase-js';
 
 // Initialize Vercel Web Analytics
 inject();
+
+// Initialize Supabase (Ensure the URL is fully formatted)
+const SUPABASE_URL = "https://obsihotephygxkqpbrrv.supabase.co"; 
+const SUPABASE_KEY = "sb_publishable_CAMYNujLRhfeGfv6ofDSrQ_ABk_4pMf";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const MODULES = [
   {
@@ -29,10 +35,6 @@ const MODULES = [
 
 const STORAGE_KEY = "amcatPracticeArenaUsers";
 const SESSION_KEY = "amcatPracticeArenaCurrentUser";
-const SUPABASE_KEY = "sb_publishable_CAMYNujLRhfeGfv6ofDSrQ_ABk_4pMf";
-const SUPABASE_URL = "obsihotephygxkqpbrrv";
-
-
 
 const state = {
   questions: [],
@@ -63,16 +65,6 @@ const screens = {
   result: $("#resultScreen"),
 };
 
-const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const pick = (items) => items[rand(0, items.length - 1)];
-
-function pickUnique(pool) {
-  const available = pool.filter(q => !state.usedQuestions.has(q.text));
-  const selected = available.length > 0 ? pick(available) : pick(pool);
-  state.usedQuestions.add(selected.text);
-  return selected;
-}
-
 function shuffle(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
@@ -81,154 +73,57 @@ function makeOptions(answer, distractors) {
   return shuffle([answer, ...shuffle(distractors).slice(0, 3)]);
 }
 
-function decodeHTML(html) {
-  const txt = document.createElement("textarea");
-  txt.innerHTML = html;
-  return txt.value;
-}
-
-function englishQuestion(forcedTopic) {
-  const topic = forcedTopic || pick(MODULES[0].topics);
-  
-  // Handled Vocabulary & Synonyms/Antonyms
-  if (["Synonyms", "Antonyms", "Contextual Vocabulary"].includes(topic)) {
-    const words = [
-      { word: "abundant", syn: "plentiful", ant: ["scarce", "ancient", "fragile", "silent"] },
-      { word: "meticulous", syn: "careful", ant: ["careless", "quick", "ordinary", "doubtful"] },
-      { word: "reluctant", syn: "unwilling", ant: ["eager", "bright", "loyal", "simple"] },
-      { word: "brief", syn: "short", ant: ["lengthy", "formal", "direct", "clever"] },
-      { word: "expand", syn: "increase", ant: ["reduce", "repair", "defend", "measure"] },
-      { word: "hostile", syn: "unfriendly", ant: ["friendly", "hidden", "patient", "useful"] },
-      { word: "lucid", syn: "clear", ant: ["confusing", "dark", "heavy", "complex"] },
-      { word: "obsolete", syn: "outdated", ant: ["modern", "current", "fresh", "new"] },
-      { word: "diligent", syn: "hardworking", ant: ["lazy", "tired", "slow", "bored"] }
-    ];
-    
-    // Package the word so pickUnique can track it by the 'text' property
-    const selected = pickUnique(words.map(w => ({ text: w.word, data: w })));
-    const { word, syn, ant } = selected.data;
-    
-    if (topic === "Antonyms") {
-      return { topic, text: `Choose the antonym of "${word}".`, answer: ant[0], options: makeOptions(ant[0], [syn, ...ant.slice(1), "neutral"]) };
-    }
-    return { topic, text: `Choose the closest meaning of "${word}".`, answer: syn, options: makeOptions(syn, ant) };
-  }
-  
-  if (topic === "Reading Comprehension") {
-    const passages = [
-      { text: "Passage: A team improves fastest when it reviews small failures immediately after practice.", answer: "Quick review helps learning", distractors: ["Luck matters more than practice", "Notes should never be used", "Speed is always more important"] },
-      { text: "Passage: A product is useful only when it solves a real problem for the person using it.", answer: "Usefulness depends on solving user problems", distractors: ["Design is more important than function", "Expensive products are better", "Users don't know what they want"] },
-      { text: "Passage: Regular mock tests reveal weak areas better than reading notes alone.", answer: "Practice tests identify gaps", distractors: ["Notes are completely useless", "Mock tests guarantee a job", "Weak areas cannot be fixed"] },
-    ];
-    const selected = pickUnique(passages);
-    return { topic: "Reading Comprehension", text: `${selected.text} \n\nQuestion: What is the main idea of this passage?`, answer: selected.answer, options: makeOptions(selected.answer, selected.distractors) };
-  }
-  
-  if (topic === "Sentence Improvement") {
-    const questions = [
-      { text: "Choose the best improvement: She is senior than me in the company.", answer: "She is senior to me in the company.", distractors: ["She is senior from me in the company.", "She is senior than I in the company.", "No improvement"] },
-      { text: "Choose the best improvement: I prefer coffee than tea.", answer: "I prefer coffee to tea.", distractors: ["I prefer coffee over tea.", "I prefer coffee more than tea.", "No improvement"] },
-      { text: "Choose the best improvement: He didn't went to the store.", answer: "He didn't go to the store.", distractors: ["He hasn't went to the store.", "He not went to the store.", "No improvement"] }
-    ];
-    const selected = pickUnique(questions);
-    return { topic, text: selected.text, answer: selected.answer, options: makeOptions(selected.answer, selected.distractors) };
-  }
-  
-  const errorQs = [
-    { text: "Find the error: Neither the manager nor the employees was ready for the audit.", answer: "was ready", distractors: ["Neither the manager", "nor the employees", "for the audit"] },
-    { text: "Find the error: One of the boys have left his bag in the classroom.", answer: "have left", distractors: ["One of the boys", "his bag", "in the classroom"] },
-    { text: "Find the error: The scenery of Kashmir are very beautiful.", answer: "are very beautiful", distractors: ["The scenery", "of Kashmir", "No error"] }
-  ];
-  const selectedErr = pickUnique(errorQs);
-  return { topic: "Error Identification", text: selectedErr.text, answer: selectedErr.answer, options: makeOptions(selectedErr.answer, selectedErr.distractors) };
-}
-
-function logicalQuestion() {
-  const topic = pick(MODULES[1].topics);
-  
-  if (topic === "Number Series") {
-    const start = rand(2, 9);
-    const gap = rand(3, 8);
-    const answer = start + gap * 4;
-    return { topic, text: `Find the next number: ${start}, ${start + gap}, ${start + gap * 2}, ${start + gap * 3}, ?`, answer: String(answer), options: makeOptions(String(answer), [String(answer + gap), String(answer - 1), String(answer + 2), String(answer - gap)]) };
-  }
-  
-  if (topic === "Direction Sense") {
-    const north = rand(2, 8);
-    const east = rand(3, 9);
-    return { topic, text: `A person walks ${north} km north, then ${east} km east. Which direction is the person from the starting point?`, answer: "North-East", options: makeOptions("North-East", ["South-East", "North-West", "East", "South"]) };
-  }
-
-  const logicQs = [
-    { text: "Statements: All roses are flowers. Some flowers fade quickly. Which conclusion definitely follows?", answer: "All roses are flowers", distractors: ["All flowers are roses", "Some roses fade quickly", "No flowers fade", "All fading things are roses"] },
-    { text: "Statements: All cats are animals. No animals are machines. Which conclusion follows?", answer: "No cats are machines", distractors: ["Some cats are machines", "All machines are animals", "Some animals are cats", "All animals are cats"] }
-  ];
-  const selectedLogic = pickUnique(logicQs);
-  return { topic: "Deductive Logic", text: selectedLogic.text, answer: selectedLogic.answer, options: makeOptions(selectedLogic.answer, selectedLogic.distractors) };
-}
-
-function quantQuestion() {
-  const topic = pick(MODULES[2].topics);
-  
-  if (topic === "Profit & Loss") {
-    const cp = rand(20, 80) * 10;
-    const profit = pick([10, 15, 20, 25]);
-    const answer = cp + (cp * profit) / 100;
-    return { topic, text: `An article costs Rs. ${cp}. It is sold at ${profit}% profit. What is the selling price?`, answer: `Rs. ${answer}`, options: makeOptions(`Rs. ${answer}`, [`Rs. ${cp - profit}`, `Rs. ${cp + profit}`, `Rs. ${answer + 20}`, `Rs. ${answer - 20}`]) };
-  }
-  
-  if (topic === "Time Speed Distance") {
-    const speed = rand(30, 80);
-    const time = rand(2, 6);
-    return { topic, text: `A train travels at ${speed} km/h for ${time} hours. What distance does it cover?`, answer: `${speed * time} km`, options: makeOptions(`${speed * time} km`, [`${speed + time} km`, `${speed * (time + 1)} km`, `${speed * time - 10} km`, `${speed * time + 15} km`]) };
-  }
-  
-  const a = rand(12, 48);
-  const b = rand(3, 12);
-  return { topic: "Numbers", text: `Calculate ${a} x ${b}.`, answer: String(a * b), options: makeOptions(String(a * b), [String(a + b), String(a * b + b), String(a * b - a), String(a * (b + 1))]) };
-}
-
-function gcd(a, b) {
-  while (b) [a, b] = [b, a % b];
-  return a;
-}
-
 async function buildExam() {
   state.questions = [];
   state.moduleEnds = [];
   state.usedQuestions = new Set();
   
-  let apiLogicQs = [];
-
   try {
-    // Only fetching API data for Logic now! English is 100% local.
-    const logRes = await fetch(`https://opentdb.com/api.php?amount=${MODULES[1].count}&category=18&type=multiple`);
-    const logData = await logRes.json();
-    apiLogicQs = logData.results || [];
-  } catch (error) {
-    console.warn("External API fetch incomplete. Using local generators.");
-  }
+    // Fetch all questions from Supabase
+    const { data: allDbQuestions, error } = await supabase
+      .from('questions')
+      .select('*');
 
-  MODULES.forEach((module) => {
-    for (let i = 0; i < module.count; i += 1) {
-      let q = null;
-      const topic = pick(module.topics);
-
-      if (module.key === "english") {
-        // ALWAYS use our local AMCAT generator for English
-        q = englishQuestion(topic);
-      } else if (module.key === "logic" && apiLogicQs[i]) {
-        const item = apiLogicQs[i];
-        q = { topic: "API: Logic & Tech", text: decodeHTML(item.question), answer: decodeHTML(item.correct_answer), options: makeOptions(decodeHTML(item.correct_answer), item.incorrect_answers.map(decodeHTML)) };
-      } else {
-        const generator = module.key === "logic" ? logicalQuestion : quantQuestion;
-        q = generator();
-      }
-
-      state.questions.push({ ...q, module: module.name, moduleKey: module.key, minutes: module.minutes });
+    if (error) {
+      console.error("Supabase Error:", error);
+      alert("Failed to connect to the database. Please check your network.");
+      return;
     }
-    state.moduleEnds.push(state.questions.length - 1);
-  });
+
+    // Build the exam using ONLY database questions
+    MODULES.forEach((module) => {
+      const moduleQuestions = allDbQuestions.filter(q => q.module === module.key);
+      const shuffledModuleQs = shuffle(moduleQuestions);
+
+      for (let i = 0; i < module.count; i += 1) {
+        const q = shuffledModuleQs[i];
+        
+        if (q) {
+          // Parse the JSON distractors from the database
+          let distractorsList = [];
+          try {
+            distractorsList = JSON.parse(q.distractors);
+          } catch(e) {
+            console.error("Could not parse distractors for:", q.text);
+          }
+
+          state.questions.push({ 
+            topic: q.topic, 
+            text: q.text, 
+            answer: q.answer, 
+            options: makeOptions(q.answer, distractorsList),
+            module: module.name, 
+            moduleKey: module.key, 
+            minutes: module.minutes 
+          });
+        }
+      }
+      state.moduleEnds.push(state.questions.length - 1);
+    });
+
+  } catch (error) {
+    console.error("Critical Failure building exam:", error);
+  }
 
   state.index = 0;
   state.score = 0;
@@ -558,8 +453,6 @@ function renderQuestBoard() {
 function hintText(topic) {
   const hints = {
     "Numbers": "Don't rush the multiplication. Break it into smaller parts if needed.",
-    "External: Reading & General": "Read the question twice before looking at the answers.",
-    "External: Logic & Tech": "Eliminate the most obviously wrong answer first.",
     "Profit & Loss": "Selling price = cost price plus profit.",
     "Time Speed Distance": "Distance = speed x time.",
   };
