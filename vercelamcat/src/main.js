@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 // Initialize Vercel Web Analytics
 inject();
 
-// Initialize Supabase (Ensure the URL is fully formatted)
+// Initialize Supabase
 const SUPABASE_URL = "https://obsihotephygxkqpbrrv.supabase.co"; 
 const SUPABASE_KEY = "sb_publishable_CAMYNujLRhfeGfv6ofDSrQ_ABk_4pMf";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -99,16 +99,30 @@ async function buildExam() {
         const q = shuffledModuleQs[i];
         
         if (q) {
-          // Parse the JSON distractors from the database
+          // --- BULLETPROOF DISTRACTOR PARSER ---
           let distractorsList = [];
-          try {
-            distractorsList = JSON.parse(q.distractors);
-          } catch(e) {
-            console.error("Could not parse distractors for:", q.text);
+          
+          if (Array.isArray(q.distractors)) {
+            distractorsList = q.distractors;
+          } else if (typeof q.distractors === 'string') {
+            try {
+              distractorsList = JSON.parse(q.distractors);
+            } catch(e) {
+              try {
+                distractorsList = JSON.parse(q.distractors.replace(/'/g, '"'));
+              } catch(e2) {
+                distractorsList = q.distractors.replace(/[\[\]]/g, '').split(',').map(s => s.trim());
+              }
+            }
           }
 
+          if (!Array.isArray(distractorsList) || distractorsList.length === 0) {
+            distractorsList = ["Placeholder A", "Placeholder B", "Placeholder C"];
+          }
+          // ------------------------------------
+
           state.questions.push({ 
-            topic: q.topic, 
+            topic: q.topic || "General", 
             text: q.text, 
             answer: q.answer, 
             options: makeOptions(q.answer, distractorsList),
@@ -200,7 +214,7 @@ function renderQuestion() {
   const question = state.questions[state.index];
   $("#moduleLabel").textContent = question.module;
   $("#questionTitle").textContent = `Question ${state.index + 1} of ${state.questions.length}`;
-  $("#topicBadge").textContent = question.topic;
+  $("#topicBadge").textContent = question.topic || "General";
   $("#streakBadge").textContent = `Streak ${state.streak}`;
   $("#questionText").textContent = question.text;
   $("#scoreText").textContent = state.score;
