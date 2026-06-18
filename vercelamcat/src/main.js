@@ -28,36 +28,45 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-// --- GAMIFICATION: Retro Audio Synth ---
+// --- GAMIFICATION: Retro Audio Synth (CRASH PROOFED) ---
 let audioCtx = null;
 function initAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext && !audioCtx) audioCtx = new AudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {
+    console.warn("Audio engine bypassed to prevent freeze.");
+  }
 }
 
 function playSound(type, streak) {
-  if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
+  try {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
 
-  if (type === 'correct') {
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(400 + (streak * 40), audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(600 + (streak * 40), audioCtx.currentTime + 0.1);
-    gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
-  } else {
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.2);
-    gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.2);
+    if (type === 'correct') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400 + (streak * 40), audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(600 + (streak * 40), audioCtx.currentTime + 0.1);
+      gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.1);
+    } else {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.2);
+      gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.2);
+    }
+  } catch(e) {
+    // Ignore audio errors silently so the game never freezes
   }
 }
 
@@ -107,17 +116,13 @@ async function buildExam() {
     const { data: allDbQuestions, error } = await supabase.from('questions').select('*');
     if (error) { console.error("Supabase Error:", error); return; }
 
-    // --- ANTI-REPETITION: Get history of seen questions ---
     const user = getUser();
     const seenTexts = new Set(user?.seenQuestions || []);
 
     MODULES.forEach((module) => {
       const moduleQuestions = allDbQuestions.filter(q => q.module === module.key);
-      
-      // Filter out anything you've already seen
       let availableQs = moduleQuestions.filter(q => !seenTexts.has(q.text));
 
-      // Safety net: If you run out of fresh questions, recycle old ones
       if (availableQs.length < module.count) {
         console.warn(`Running low on fresh questions for ${module.key}. Recycling pool!`);
         availableQs = moduleQuestions; 
@@ -228,7 +233,6 @@ function renderQuestion() {
   $("#fiftyButton").disabled = state.fiftyUsed;
   $("#nextQuestion").disabled = true;
 
-  // Visual Health Warning
   if (state.shields === 1) document.body.classList.add("critical-health");
   else document.body.classList.remove("critical-health");
 
@@ -249,6 +253,7 @@ function chooseAnswer(button, selected) {
   if (state.locked) return;
   state.locked = true;
   initAudio();
+  
   const question = state.questions[state.index];
   const correct = selected === question.answer;
 
@@ -260,7 +265,6 @@ function chooseAnswer(button, selected) {
   state.shields = correct ? state.shields : Math.max(0, state.shields - 1);
   state.answers.push({ ...question, selected, correct });
 
-  // Trigger Audio & Visuals
   playSound(correct ? 'correct' : 'wrong', state.streak);
   if (correct && state.streak > 0 && state.streak % 3 === 0) showComboPopup(state.streak);
   if (state.shields === 1) document.body.classList.add("critical-health");
@@ -472,7 +476,6 @@ function saveFinishedAttempt(correct, accuracy) {
     if (state.maxStreak >= 5) award("Combo Climber"); if (state.shields === 3) award("Untouched Shields");
     if (moduleSummary().some((module) => module.correct === module.total)) award("Module Master");
 
-    // --- ANTI-REPETITION: Save questions to memory bank ---
     const seen = new Set(user.seenQuestions || []);
     state.questions.forEach(q => seen.add(q.text));
     user.seenQuestions = [...seen];
